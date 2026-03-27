@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>¡A Lavar los Dientes!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Nunito', sans-serif; user-select: none; -webkit-user-select: none; }
+        body { background-color: #B2EBF2; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none; overflow: hidden; }
+        #game-container { width: 100%; max-width: 500px; height: 100%; max-height: 800px; background-color: white; box-shadow: 0 0 20px rgba(0,0,0,0.1); position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        .screen { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        .screen.active { display: flex; }
+        h1 { color: #6B1A41; font-size: 2.2rem; text-align: center; margin-bottom: 20px; padding: 0 10px; }
+        .hippo-large { width: 250px; height: 250px; margin-bottom: 30px; }
+        .btn { background-color: #AEC6CF; color: white; border: none; border-radius: 30px; padding: 15px 40px; font-size: 1.5rem; font-weight: 900; cursor: pointer; box-shadow: 0 6px 0 #8CA6AF; transition: transform 0.1s, box-shadow 0.1s; }
+        .btn:active { transform: translateY(6px); box-shadow: 0 0 0 #8CA6AF; }
+        #instruction-bar { width: 100%; padding: 15px 10px; background-color: #FDFD96; color: #333; font-size: 1.4rem; font-weight: bold; text-align: center; position: absolute; top: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .character-area { position: relative; margin-top: 60px; }
+        #hippo-character { width: 320px; height: 320px; }
+        #dirt-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .dirt-spot { position: absolute; font-size: 40px; transition: opacity 0.2s, transform 0.2s; user-select: none; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        .tools-area { display: flex; justify-content: center; align-items: center; gap: 30px; margin-top: auto; margin-bottom: 40px; height: 120px; width: 100%; background-color: rgba(255,255,255,0.8); border-top: 2px dashed #B19CD9; }
+        .tool { font-size: 80px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); cursor: grab; touch-action: none; position: relative; z-index: 100; transition: transform 0.1s; }
+        .tool:active { cursor: grabbing; transform: scale(1.1); }
+        .tool.hidden { display: none; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        .bounce { animation: bounce 1.5s infinite alternate ease-in-out; }
+        #fx-container, #fx-container-success { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+        .star { position: absolute; font-size: 40px; animation: fall 2.5s linear forwards; }
+        @keyframes fall { 0% { transform: translateY(-50px) rotate(0deg); opacity: 1; } 100% { transform: translateY(800px) rotate(360deg); opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Pantalla de Inicio -->
+        <div id="screen-intro" class="screen active">
+            <h1>¡A Lavar los Dientes!</h1>
+            <img id="img-intro" src="" class="hippo-large bounce" alt="Hipopótamo feliz">
+            <button id="btn-start" class="btn">¡Aprender a cepillar!</button>
+        </div>
+
+        <!-- Pantalla de Juego -->
+        <div id="screen-game" class="screen">
+            <div id="instruction-bar">Paso 1: Enjuaga el cepillo</div>
+            
+            <div class="character-area">
+                <img id="hippo-character" src="" alt="Hipopótamo con la boca abierta">
+                <!-- La mugre se agregará dinámicamente aquí -->
+                <div id="dirt-container"></div>
+            </div>
+
+            <div class="tools-area">
+                <div id="water-stream" class="tool hidden" title="Agua">💧</div>
+                <div id="toothpaste-tube" class="tool hidden" title="Pasta de Dientes">🧴</div>
+                <div id="water-cup" class="tool hidden" title="Vaso con Agua">🥛</div>
+                <div id="toothbrush" class="tool" title="Cepillo de Dientes">🪥</div>
+            </div>
+            
+            <div id="fx-container"></div>
+        </div>
+        
+        <!-- Pantalla de Éxito -->
+        <div id="screen-success" class="screen">
+            <h1>¡Boca reluciente!</h1>
+            <img id="img-success" src="" class="hippo-large bounce" alt="Hipopótamo muy feliz">
+            <h2 style="color: #6B1A41; text-align: center; margin: 0 20px 20px; font-size: 1.2rem;">¡Lo hiciste genial! Ya sabes como mantener tus dientes limpios.</h2>
+            <button id="btn-restart" class="btn">Jugar de nuevo</button>
+            <div id="fx-container-success"></div>
+        </div>
+    </div>
+    
+    <script>
+        const SVG_HIPPO_CLOSED = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="50" cy="50" r="15" fill="#B19CD9" /><circle cx="150" cy="50" r="15" fill="#B19CD9" /><rect x="40" y="40" width="120" height="100" rx="40" fill="#B19CD9" /><path d="M 65 75 Q 75 65 85 75" fill="none" stroke="#222" stroke-width="4" stroke-linecap="round" /><path d="M 115 75 Q 125 65 135 75" fill="none" stroke="#222" stroke-width="4" stroke-linecap="round" /><rect x="30" y="90" width="140" height="90" rx="45" fill="#CBB6F8" /><circle cx="70" cy="110" r="8" fill="#E6A8D7" /><circle cx="130" cy="110" r="8" fill="#E6A8D7" /><path d="M 60 140 Q 100 170 140 140" fill="none" stroke="#6B1A41" stroke-width="6" stroke-linecap="round" /><ellipse cx="50" cy="130" rx="15" ry="10" fill="#ffb6c1" opacity="0.6"/><ellipse cx="150" cy="130" rx="15" ry="10" fill="#ffb6c1" opacity="0.6"/></svg>';
+        const SVG_HIPPO_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="50" cy="50" r="15" fill="#B19CD9" /><circle cx="150" cy="50" r="15" fill="#B19CD9" /><rect x="40" y="40" width="120" height="100" rx="40" fill="#B19CD9" /><circle cx="75" cy="75" r="7" fill="#222" /><circle cx="78" cy="72" r="2" fill="white" /><circle cx="125" cy="75" r="7" fill="#222" /><circle cx="128" cy="72" r="2" fill="white" /><rect x="30" y="90" width="140" height="90" rx="45" fill="#CBB6F8" /><circle cx="70" cy="110" r="8" fill="#E6A8D7" /><circle cx="130" cy="110" r="8" fill="#E6A8D7" /><path d="M 50 130 Q 100 190 150 130" fill="#6B1A41" /><path d="M 70 155 Q 100 180 130 155 Q 115 170 100 170 Q 85 170 70 155" fill="#FFB6C1" /><rect x="70" y="130" width="16" height="16" rx="4" fill="white" /><rect x="92" y="130" width="16" height="16" rx="4" fill="white" /><rect x="114" y="130" width="16" height="16" rx="4" fill="white" /><rect x="80" y="150" width="16" height="16" rx="4" fill="white" /><rect x="104" y="150" width="16" height="16" rx="4" fill="white" /></svg>';
+        
+        const hippoURI_closed = 'data:image/svg+xml;utf8,' + encodeURIComponent(SVG_HIPPO_CLOSED);
+        const hippoURI_open = 'data:image/svg+xml;utf8,' + encodeURIComponent(SVG_HIPPO_OPEN);
+
+        document.getElementById('img-intro').src = hippoURI_closed;
+        document.getElementById('img-success').src = hippoURI_closed;
+
+        const STATES = { RINSE_BRUSH: 1, APPLY_PASTE: 2, BRUSH_TEETH: 3, BRUSH_TONGUE: 4, RINSE_MOUTH: 5, DONE: 6 };
+        let currentState = STATES.RINSE_BRUSH;
+
+        const screens = { intro: document.getElementById('screen-intro'), game: document.getElementById('screen-game'), success: document.getElementById('screen-success') };
+        const instructions = document.getElementById('instruction-bar');
+        const tools = { brush: document.getElementById('toothbrush'), water: document.getElementById('water-stream'), paste: document.getElementById('toothpaste-tube'), cup: document.getElementById('water-cup') };
+        const hippo = document.getElementById('hippo-character');
+        const dirtContainer = document.getElementById('dirt-container');
+        const fxContainer = document.getElementById('fx-container');
+        const fxSuccess = document.getElementById('fx-container-success');
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (type === 'success') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(1046.50, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'brush') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'win') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(440, audioCtx.currentTime); osc.frequency.setValueAtTime(554, audioCtx.currentTime + 0.2); osc.frequency.setValueAtTime(659, audioCtx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.0);
+                osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 1.0);
+            }
+        }
+
+        let isDragging = false;
+        let currentTool = null;
+        let dragCount = 0;
+
+        function initDrag(el) {
+            el.addEventListener('mousedown', dragStart);
+            el.addEventListener('touchstart', (e) => { if(e.cancelable) e.preventDefault(); dragStart(e.touches[0], true); }, {passive: false});
+        }
+
+        function dragStart(e, isTouch = false) {
+            isDragging = true; currentTool = e.target; const rect = currentTool.getBoundingClientRect();
+            currentTool.style.position = 'fixed'; currentTool.style.zIndex = '1000';
+            
+            function setPosition(pageX, pageY) { currentTool.style.left = (pageX - rect.width/2) + 'px'; currentTool.style.top = (pageY - rect.height/2) + 'px'; }
+            setPosition(e.clientX || e.pageX, e.clientY || e.pageY);
+            
+            const moveEvent = isTouch ? 'touchmove' : 'mousemove'; const endEvent = isTouch ? 'touchend' : 'mouseup';
+            
+            function moveMove(ev) {
+                if (!isDragging) return; if(ev.cancelable) ev.preventDefault();
+                const pageX = ev.touches ? ev.touches[0].clientX : ev.clientX; const pageY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+                setPosition(pageX, pageY); checkInteractions(pageX, pageY);
+            }
+            
+            function moveEnd(ev) {
+                isDragging = false; document.removeEventListener(moveEvent, moveMove); document.removeEventListener(endEvent, moveEnd);
+                currentTool.style.position = 'static'; currentTool.style.zIndex = '100';
+                checkStateTransitions(currentTool);
+            }
+            
+            document.addEventListener(moveEvent, moveMove, {passive: false}); document.addEventListener(endEvent, moveEnd);
+        }
+
+        function createDirt(type) {
+            dirtContainer.innerHTML = ''; const isTeeth = type === 'teeth';
+            const positions = isTeeth ? [ {x: 35, y: 55}, {x: 50, y: 56}, {x: 65, y: 55}, {x: 40, y: 68}, {x: 60, y: 68} ] : [ {x: 40, y: 75}, {x: 50, y: 72}, {x: 60, y: 75} ];
+                
+            positions.forEach((pos, index) => {
+                const dirt = document.createElement('div'); dirt.className = 'dirt-spot'; dirt.innerText = isTeeth ? '🦠' : '🟣';
+                if(!isTeeth) dirt.style.filter = "hue-rotate(90deg)";
+                dirt.style.left = `calc(${pos.x}% - 20px)`; dirt.style.top  = `calc(${pos.y}% - 20px)`; dirt.dataset.life = 100; dirt.dataset.id = index;
+                dirtContainer.appendChild(dirt);
+            });
+        }
+
+        function checkInteractions(x, y) {
+            if (currentState === STATES.BRUSH_TEETH || currentState === STATES.BRUSH_TONGUE) {
+                if (currentTool !== tools.brush) return;
+                const spots = document.querySelectorAll('.dirt-spot'); const hitboxOverlap = 40;
+                
+                spots.forEach(spot => {
+                    const rect = spot.getBoundingClientRect();
+                    if (x > rect.left - hitboxOverlap && x < rect.right + hitboxOverlap && y > rect.top - hitboxOverlap && y < rect.bottom + hitboxOverlap) {
+                        let life = parseInt(spot.dataset.life);
+                        if (life > 0) {
+                            life -= 4; spot.dataset.life = life; spot.style.opacity = life / 100; spot.style.transform = `scale(${life / 100})`;
+                            dragCount++; if (dragCount % 5 === 0) playSound('brush');
+                        }
+                    }
+                });
+                
+                let allClean = true; spots.forEach(spot => { if (parseInt(spot.dataset.life) > 0) allClean = false; });
+                
+                if (allClean && spots.length > 0) {
+                    dirtContainer.innerHTML = ''; playSound('success'); spawnStars(fxContainer);
+                    advanceState(currentState === STATES.BRUSH_TEETH ? STATES.BRUSH_TONGUE : STATES.RINSE_MOUTH);
+                }
+            }
+        }
+
+        function checkStateTransitions(droppedTool) {
+            if (currentState === STATES.RINSE_BRUSH) {
+                if (droppedTool === tools.brush || droppedTool === tools.water) { advanceState(STATES.APPLY_PASTE); playSound('success'); spawnStars(fxContainer); }
+            } else if (currentState === STATES.APPLY_PASTE) {
+                if (droppedTool === tools.brush || droppedTool === tools.paste) { tools.brush.innerText = '🪥🫧'; advanceState(STATES.BRUSH_TEETH); playSound('success'); spawnStars(fxContainer); }
+            } else if (currentState === STATES.RINSE_MOUTH) {
+                if (droppedTool === tools.cup || droppedTool === hippo) { advanceState(STATES.DONE); playSound('win'); spawnStars(fxSuccess, 30); }
+            }
+        }
+
+        function advanceState(newState) { currentState = newState; updateUI(); }
+
+        function updateUI() {
+            tools.water.classList.add('hidden'); tools.paste.classList.add('hidden'); tools.cup.classList.add('hidden'); tools.brush.classList.add('hidden');
+            switch(currentState) {
+                case STATES.RINSE_BRUSH: instructions.innerText = "Paso 1: Arrastra el cepillo a la gota"; tools.brush.classList.remove('hidden'); tools.water.classList.remove('hidden'); tools.water.style.animation = "bounce 1s infinite alternate"; break;
+                case STATES.APPLY_PASTE: instructions.innerText = "Paso 2: Arrastra la pasta al cepillo"; tools.brush.classList.remove('hidden'); tools.paste.classList.remove('hidden'); tools.water.style.animation = ""; tools.paste.style.animation = "bounce 1s infinite alternate"; break;
+                case STATES.BRUSH_TEETH: instructions.innerText = "Paso 3: ¡Frota los dientes del hipopótamo!"; tools.brush.classList.remove('hidden'); tools.paste.style.animation = ""; createDirt('teeth'); break;
+                case STATES.BRUSH_TONGUE: instructions.innerText = "Paso 4: ¡Frota la lengua para limpiar todo!"; tools.brush.classList.remove('hidden'); createDirt('tongue'); break;
+                case STATES.RINSE_MOUTH: instructions.innerText = "Paso 5: Arrastra el vaso para enjuagar"; tools.cup.classList.remove('hidden'); hippo.src = hippoURI_closed; tools.cup.style.animation = "bounce 1s infinite alternate"; break;
+                case STATES.DONE: screens.game.classList.remove('active'); screens.success.classList.add('active'); break;
+            }
+        }
+
+        function spawnStars(container, amount = 15) {
+            for (let i = 0; i < amount; i++) {
+                const star = document.createElement('div'); star.className = 'star'; star.innerText = ['⭐', '✨', '🎉', '🌟'][Math.floor(Math.random()*4)];
+                star.style.left = (Math.random() * 90) + '%'; star.style.animationDuration = (1.5 + Math.random()) + 's';
+                container.appendChild(star); setTimeout(() => star.remove(), 3000);
+            }
+        }
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            screens.intro.classList.remove('active'); screens.game.classList.add('active');
+            currentState = STATES.RINSE_BRUSH; hippo.src = hippoURI_open; tools.brush.innerText = '🪥'; updateUI();
+        });
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            screens.success.classList.remove('active'); screens.game.classList.add('active');
+            currentState = STATES.RINSE_BRUSH; hippo.src = hippoURI_open; tools.brush.innerText = '🪥'; updateUI();
+        });
+
+        [tools.brush, tools.paste, tools.water, tools.cup].forEach(initDrag);
+        hippo.addEventListener('dragstart', e => e.preventDefault());
+    </script>
+</body>
+</html>
